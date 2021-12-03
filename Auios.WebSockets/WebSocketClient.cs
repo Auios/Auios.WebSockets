@@ -8,10 +8,7 @@ namespace Auios.WebSockets
     {
         public readonly Socket socket;
 
-        public WebSocketClient(Socket socket)
-        {
-            this.socket = socket;
-        }
+        public WebSocketClient(Socket socket) => this.socket = socket;
 
         public void Close() => socket.Close();
 
@@ -116,10 +113,7 @@ namespace Auios.WebSockets
             socket.Send(message);
         }
 
-        public void Send(string message)
-        {
-            Send(Encoding.UTF8.GetBytes(message));
-        }
+        public void Send(string message) => Send(Encoding.UTF8.GetBytes(message));
 
         public bool CompleteHandshake()
         {
