@@ -27,10 +27,51 @@ namespace Auios.WebSockets
         {
             byte[] data = ReceiveRaw();
 
+            // Indicates that this is the final fragment in a message.  The first
+            // fragment MAY also be the final fragment.
             bool finished = (data[0] & 0b1000_0000) != 0; // Is true if the message is finished sending.
-            bool mask = (data[1] & 0b1000_0000) != 0; // Must be true. All messages have this bit set.
-            int opCode = data[0] & 0b0000_1111; // 1 = Text message.
+            
+            // MUST be 0 unless an extension is negotiated that defines meanings
+            // for non-zero values.  If a nonzero value is received and none of
+            // the negotiated extensions defines the meaning of such a nonzero
+            // value, the receiving endpoint MUST _Fail the WebSocket
+            // Connection_.
+            bool rsv1 = (data[0] & 0b1000_0000) != 0;
+            bool rsv2 = (data[0] & 0b0100_0000) != 0;
+            bool rsv3 = (data[0] & 0b0010_0000) != 0;
+            
+            // Opcode:
+            // 0 : denotes a continuation frame
+            // 1 : denotes a text frame
+            // 2 : denotes a binary frame
+            // 3 - 7 : reserved for further non-control frames
+            // 8 : denotes a connection close
+            // 9 : denotes a ping
+            // 10 : denotes a pong
+            // 11 - 15 : reserved for further control frames
+            int opCode = data[0] & 0b0000_1111;
+            
+            // Defines whether the "Payload data" is masked.  If set to 1, a
+            // masking key is present in masking-key, and this is used to unmask
+            // the "Payload data" as per Section 5.3.  All frames sent from
+            // client to server have this bit set to 1.
+            bool mask = (data[1] & 0b1000_0000) != 0;
+            
+            // The length of the "Payload data", in bytes: if 0-125, that is the
+            // payload length.  If 126, the following 2 bytes interpreted as a
+            // 16-bit unsigned integer are the payload length.  If 127, the
+            // following 8 bytes interpreted as a 64-bit unsigned integer (the
+            // most significant bit MUST be 0) are the payload length.  Multibyte
+            // length quantities are expressed in network byte order.  Note that
+            // in all cases, the minimal number of bytes MUST be used to encode
+            // the length, for example, the length of a 124-byte-long string
+            // can't be encoded as the sequence 126, 0, 124.  The payload length
+            // is the length of the "Extension data" + the length of the
+            // "Application data".  The length of the "Extension data" may be
+            // zero, in which case the payload length is the length of the
+            // "Application data".
             int msgLen = data[1] & 0b0111_1111; // -128
+            
             int offset = 2;
             
             if(msgLen == 126)
