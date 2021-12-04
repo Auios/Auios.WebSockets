@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -12,33 +13,33 @@ namespace Auios.WebSockets
 
         public void Close() => socket.Close();
 
-        public string ip => socket.RemoteEndPoint.ToString();
+        public EndPoint ip => socket.RemoteEndPoint;
 
         public int available => socket.Available;
 
-        public byte[] ReceiveRaw()
+        public byte[] Receive()
         {
             byte[] data = new byte[available];
             socket.Receive(data);
             return data;
         }
 
-        public byte[] Receive()
+        public Frame ReceiveFrame()
         {
-            byte[] data = ReceiveRaw();
+            byte[] data = Receive();
+            Frame f;
 
             // Indicates that this is the final fragment in a message.  The first
             // fragment MAY also be the final fragment.
-            bool finished = (data[0] & 0b1000_0000) != 0; // Is true if the message is finished sending.
-            
+            f.fin = (data[0] & 0b1000_0000) != 0; // Is true if the message is finished sending.
             // MUST be 0 unless an extension is negotiated that defines meanings
             // for non-zero values.  If a nonzero value is received and none of
             // the negotiated extensions defines the meaning of such a nonzero
             // value, the receiving endpoint MUST _Fail the WebSocket
             // Connection_.
-            bool rsv1 = (data[0] & 0b1000_0000) != 0;
-            bool rsv2 = (data[0] & 0b0100_0000) != 0;
-            bool rsv3 = (data[0] & 0b0010_0000) != 0;
+            f.rsv1 = (data[0] & 0b1000_0000) != 0;
+            f.rsv2 = (data[0] & 0b0100_0000) != 0;
+            f.rsv3 = (data[0] & 0b0010_0000) != 0;
             
             // Opcode:
             // 0 : denotes a continuation frame
@@ -49,13 +50,12 @@ namespace Auios.WebSockets
             // 9 : denotes a ping
             // 10 : denotes a pong
             // 11 - 15 : reserved for further control frames
-            int opCode = data[0] & 0b0000_1111;
-            
+            f.op = data[0] & 0b0000_1111;
             // Defines whether the "Payload data" is masked.  If set to 1, a
             // masking key is present in masking-key, and this is used to unmask
             // the "Payload data" as per Section 5.3.  All frames sent from
             // client to server have this bit set to 1.
-            bool mask = (data[1] & 0b1000_0000) != 0;
+            f.mask = (data[1] & 0b1000_0000) != 0;
             
             // The length of the "Payload data", in bytes: if 0-125, that is the
             // payload length.  If 126, the following 2 bytes interpreted as a
@@ -70,31 +70,31 @@ namespace Auios.WebSockets
             // "Application data".  The length of the "Extension data" may be
             // zero, in which case the payload length is the length of the
             // "Application data".
-            int msgLen = data[1] & 0b0111_1111; // -128
+            f.len = data[1] & 0b0111_1111; // -128
             
             int offset = 2;
             
-            if(msgLen == 126)
+            if(f.len == 126)
             {
-                msgLen = BitConverter.ToUInt16(new byte[] {data[3], data[2]}, 0);
+                f.len = BitConverter.ToUInt16(new[] {data[3], data[2]}, 0);
                 offset = 4;
             }
-            else if(msgLen == 127)
+            else if(f.len == 127)
             {
                 //Console.WriteLine("msgLen == 127, needs uint64 to store msgLen");
                 // msglen = BitConverter.ToUInt64(new byte[] { bytes[5], bytes[4], bytes[3], bytes[2], bytes[9], bytes[8], bytes[7], bytes[6] }, 0);
                 // offset = 10;
             }
 
-            byte[] decoded = Array.Empty<byte>();
+            f.data = Array.Empty<byte>();
 
-            if(msgLen == 0)
+            if(f.len == 0)
             {
                 //Console.WriteLine("msgLen == 0");
             }
-            else if(mask)
+            else if(f.mask)
             {
-                decoded = new byte[msgLen];
+                f.data = new byte[f.len];
                 byte[] masks =
                 {
                     data[offset],
@@ -104,13 +104,13 @@ namespace Auios.WebSockets
                 };
                 offset += 4;
 
-                for(int i = 0; i < msgLen; i++)
+                for(int i = 0; i < f.len; i++)
                 {
-                    decoded[i] = (byte)(data[offset + i] ^ masks[i % 4]);
+                    f.data[i] = (byte)(data[offset + i] ^ masks[i % 4]);
                 }
             }
 
-            return decoded;
+            return f;
         }
 
         public void Send(byte[] data)
@@ -158,7 +158,7 @@ namespace Auios.WebSockets
 
         public bool CompleteHandshake()
         {
-            byte[] data = ReceiveRaw();
+            byte[] data = Receive();
             if(data.Length < 3) return false;
             
             string key = string.Empty;
