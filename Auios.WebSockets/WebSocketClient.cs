@@ -155,6 +155,7 @@ namespace Auios.WebSockets
         }
 
         public void Send(string message) => Send(Encoding.UTF8.GetBytes(message));
+        public void SendRaw(string message) => socket.Send(Encoding.UTF8.GetBytes(message));
 
         public bool CompleteHandshake()
         {
@@ -162,11 +163,11 @@ namespace Auios.WebSockets
             if(data.Length < 3) return false;
             
             string key = string.Empty;
-            string header = Encoding.UTF8.GetString(data);
-            string[] headers = header.Split(new[] {'\r', '\n'},
+            string request = Encoding.UTF8.GetString(data);
+            string[] headers = request.Split(new[] {'\r', '\n'},
                 StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-            if(!header.Contains("GET") || !header.Contains("Sec-WebSocket-Key")) return false;
+            if(!request.Contains("GET") || !request.Contains("Sec-WebSocket-Key")) return false;
             
             foreach(string line in headers)
             {
@@ -195,7 +196,9 @@ namespace Auios.WebSockets
             builder.Append($"Upgrade: websocket{eol}");
             builder.Append($"Sec-WebSocket-Accept: {key64}{eol}");
             builder.Append(eol);
-            Send(builder.ToString());
+            string response = builder.ToString();
+            
+            SendRaw(response);
             
             return true;
         }

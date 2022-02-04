@@ -10,6 +10,6 @@ namespace Auios.WebSockets
         public void Start() => listener.Start();
         public void Stop() => listener.Stop();
         public bool Pending() => listener.Pending();
-        public WebSocketClient AcceptWebSocketClient() => new WebSocketClient(listener.AcceptSocket());
+        public WebSocketClient AcceptWebSocketClient() => new(listener.AcceptSocket());
     }
 }
