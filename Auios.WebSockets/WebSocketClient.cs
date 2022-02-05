@@ -171,8 +171,7 @@ namespace Auios.WebSockets
             
             foreach(string line in headers)
             {
-                string[] pair = line.Split(':',
-                    StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                string[] pair = line.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                 if(pair.Length == 2)
                 {
                     if(pair[0] == "Sec-WebSocket-Key")
